@@ -5,7 +5,7 @@ echo "\
 email = \"your-email@domain.com\"\n\
 " > ~/.streamlit/credentials.toml
 
-"[theme]
+echo "[theme]
 primaryColor=’#631284’
 backgroundColor=’#000548’
 secondaryBackgroundColor=’#123284’
