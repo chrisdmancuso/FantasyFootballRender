@@ -41,7 +41,7 @@ def setFig(category, html):
                  x=category,
                  y=data.index,orientation="h",
                  title=html,
-                 color_discrete_sequence=["#631284"] * len(data),
+                 color_discrete_sequence=["#FF4B4B"] * len(data),
                  template="plotly_white",
                  height=800,
                  )
