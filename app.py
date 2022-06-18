@@ -62,7 +62,7 @@ def plotFig(columns, data):
             c.plotly_chart(data[count], use_container_width=True)
             count+=1
         except:
-            print("OH GEEZ")
+            print("ERROR")
 
 #Helper function to setup sidebar
 def setupSidebar():
@@ -77,14 +77,17 @@ def setupSidebar():
     max_value=50,
     step=1
     )
-    return choice, rank, rank - 1
+
+    rank2 = st.sidebar.number_input(
+    "Choose Rank to Display Detailed Stats:",
+    min_value=2,
+    max_value=50,
+    step=1,
+    key=1
+    )
+    return choice, rank, rank2, rank - 1, rank2 - 1
 
 # ----- Setup sidebar components and DataFrame -----
-radioGroup = st.sidebar.radio(
-    "Choose view:",
-    ['Top 50', 'H2H'],
-    horizontal=True,
-    )
 
 def setupDetailed(df, formatted_rank, choice):
     data = [df.iloc[formatted_rank]['Rk'], df.iloc[formatted_rank]['Player'], df.iloc[formatted_rank]['Yds'], df.iloc[formatted_rank]['TD'], df.iloc[formatted_rank]['Y/G']]
@@ -102,7 +105,7 @@ def setupDetailed(df, formatted_rank, choice):
         data.append(df.iloc[formatted_rank]['Fmb'])
     return data
     
-choice, rank, formatted_rank = setupSidebar()
+choice, rank, rank2, formatted_rank, formatted_rank2 = setupSidebar()
 print(formatted_rank)
 # 2 Things, 1st, possibly use radio button to move between 2 different views, such as top 50 and h2h and maybe detailed?
 # 2nd, possbily use the following code to access a specific player and display that at all times at top of page?
@@ -134,7 +137,16 @@ df_selection = df.query(
 avg_yards_by_field = round(df_selection['Yds'].mean(), 1)
 avg_td_by_field = round(df_selection['TD'].mean(), 1)
 avg_yPerG_by_field = round(df_selection['Y/G'].mean(), 1)
-
+if choice == 'Receiving':
+    avg_yPerA_by_field = round(df_selection['Y/R'].mean(), 1)
+    avg_atts_by_field = round(df_selection['Rec'].mean(), 1)
+else:
+    avg_yPerA_by_field = round(df_selection['Y/A'].mean(), 1)
+    avg_atts_by_field = round(df_selection['Att'].mean(), 1)
+if choice == 'Passing':
+    avg_fmbInt_by_field = round(df_selection['Int'].mean(), 1)
+else:
+    avg_fmbInt_by_field = round(df_selection['Fmb'].mean(), 1)
 # ----- YARDS -----
 yardsData = setFig('Yds', "<b>Yards by Player</b>")
 
@@ -153,33 +165,65 @@ else:
     td = setFig('TD', "<b>Rushing TD by Player</b>")
 # ----- CONTENT -----
 # Top Detailed/Top graphs
-columns = [farleft_column, left_column, midleft_column, middle_column, midright_column, right_column, farright_column, farthestright_column] = st.columns(8)
 data = setupDetailed(df, formatted_rank, choice)
-with farleft_column:
-    st.subheader("Rank:")
-    st.subheader(f'{int(data[0])}')
+data2 = setupDetailed(df, formatted_rank2, choice)
+columns = [left_column, right_column] = st.columns(2)
 with left_column:
-    st.subheader("Player:")
-    st.subheader(f'{data[1]}')
-with midleft_column:
-    st.subheader("Yards:")
-    st.subheader(f'{data[2]}')
-with middle_column:
-    st.subheader("TD:")
-    st.subheader(f'{int(data[3])}')
-with midright_column:
-    st.subheader("Y/G:")
-    st.subheader(f'{data[4]}')
+    st.subheader(f"Rank:  {int(data[0])}")
 with right_column:
-    st.subheader("Y/A:")
-    st.subheader(f'{data[5]}')
+    st.subheader(f"Player:  {data[1]}")
+    
+columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
+with left_column:
+    st.metric(label='Yards', value=int(data[2]), delta=round(data[2]-avg_yards_by_field, 2))
+with midleft_column:
+    st.metric(label='TD', value=int(data[3]), delta=round(data[3]-avg_td_by_field, 2))
+with middle_column:
+    st.metric(label='Y/G', value=data[4], delta=round(data[4]-avg_yPerG_by_field, 2))
+with midright_column:
+    st.metric(label='Y/A', value=data[5], delta=round(data[5]-avg_yPerA_by_field, 2))
+with right_column:
+    if choice == 'Receiving':
+        st.metric(label='Rec', value=data[6], delta=round(data[6]-avg_atts_by_field, 2))
+    else:
+        st.metric(label='Att', value=data[6], delta=round(data[6]-avg_atts_by_field, 2))
 with farright_column:
-    st.subheader("Att:")
-    st.subheader(f'{data[6]}')
-with farthestright_column:
-    st.subheader("Fmb:")
-    st.subheader(f'{int(data[7])}')
+    if choice == 'Passing':
+        st.metric(label='Int', value=data[7], delta=round(data[7]-avg_fmbInt_by_field, 2))
+    else:
+        st.metric(label='Fmb', value=data[7], delta=round(data[7]-avg_fmbInt_by_field, 2))
+        
 st.markdown("---")
+
+columns = [left_column, right_column] = st.columns(2)
+with left_column:
+    st.subheader(f"Rank:  {int(data2[0])}")
+with right_column:
+    st.subheader(f"Player:  {data2[1]}")
+    
+columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
+with left_column:
+    st.metric(label='Yards', value=int(data2[2]), delta=round(data2[2]-avg_yards_by_field, 2))
+with midleft_column:
+    st.metric(label='TD', value=int(data2[3]), delta=round(data2[3]-avg_td_by_field, 2))
+with middle_column:
+    st.metric(label='Y/G', value=data2[4], delta=round(data2[4]-avg_yPerG_by_field, 2))
+with midright_column:
+    st.metric(label='Y/A', value=data2[5], delta=round(data2[5]-avg_yPerA_by_field, 2))
+with right_column:
+    if choice == 'Receiving':
+        st.metric(label='Rec', value=data2[6], delta=round(data2[6]-avg_atts_by_field, 2))
+    else:
+        st.metric(label='Att', value=data2[6], delta=round(data2[6]-avg_atts_by_field, 2))
+with farright_column:
+    if choice == 'Passing':
+        st.metric(label='Int', value=data2[7], delta=round(data2[7]-avg_fmbInt_by_field, 2))
+    else:
+        st.metric(label='Fmb', value=data2[7], delta=round(data2[7]-avg_fmbInt_by_field, 2))
+        
+st.markdown("---")
+
+
 columns = [left_column, middle_column, right_column] = st.columns(3)
 with left_column:
     st.subheader("Average Yards of Selected:")
