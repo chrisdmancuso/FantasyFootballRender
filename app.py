@@ -104,6 +104,7 @@ def setupDetailed(df, formatted_rank, choice):
         data.append(df.iloc[formatted_rank]['Y/R'])
         data.append(df.iloc[formatted_rank]['Rec'])
         data.append(df.iloc[formatted_rank]['Fmb'])
+    data.append(df.iloc[formatted_rank]['G'])
     return data
 
 
@@ -134,10 +135,18 @@ def averageExpanders(data, yards, td, yg, ya, att, fmb, choice):
                 st.metric(label='Fmb', value=fmb)
 
 #Head-2-Head             
-def head2HeadExpanders(data, opp, yards, td, yg, ya, att, fmb, choice):
-    labelVal = f"Detailed Stats of {data[1]} compared to {opp}"
+def head2HeadExpanders(data, opp, yards, td, yg, ya, att, fmb, games, choice):
+    labelVal = f"Detailed {choice} Stats of {data[1]} compared to {opp}"
     with st.expander(labelVal, expanded=True):
         st.write(f"Rank: {int(data[0])}")
+        if choice == 'Passing':
+            fppg = round((.04 * (data[4])) + (4 * (data[3]/data[8])) - ((data[7]/data[8])), 2)
+            oppFppg = round((.04 * (yards/games)) + (4 * (td/games)) - ((fmb/games)), 2)
+        else:
+            fppg = round((.1 * (data[4])) + (6 * (data[3]/data[8])) - (2 *(data[7]/data[8])), 2)
+            oppFppg = round((.1 * (yards/games)) + (6 * (td/games)) - (2 *(fmb/games)), 2)
+        # Add average fantasy points per game to h2hexpander. Something like (yards/games * .1 or .25) + (td/games * 6 or 4 ) - (fmb/games * 2) - (ints/games)
+        st.metric(label='FPPG', value=fppg, delta=round(fppg-oppFppg, 2))
         columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
         with left_column:
             st.metric(label='Yards', value=int(data[2]), delta=int(data[2]-yards))
@@ -159,7 +168,8 @@ def head2HeadExpanders(data, opp, yards, td, yg, ya, att, fmb, choice):
                 st.metric(label='Fmb', value=int(data[7]), delta=int(data[7]-fmb), delta_color="inverse")
                 
 ########## END HELPER FUNCTIONS ##########
-
+                
+########## SIDEBAR ##########
 choice, rank, rank2, formatted_rank, formatted_rank2 = setupSidebar()
 df = setDF(choice)
 
@@ -178,6 +188,7 @@ pos = st.sidebar.multiselect(
 df_selection = df.query(
     "Player == @players & Pos == @pos"
     )
+########## END SIDEBAR ##########
 
 ########## KPI's ##########
 # ----- Averages ----- #
@@ -220,8 +231,8 @@ data = setupDetailed(df, formatted_rank, choice)
 data2 = setupDetailed(df, formatted_rank2, choice)
 
 #Create 1st and 2nd H2H expanders
-head2HeadExpanders(data, data2[1], data2[2], data2[3], data2[4], data2[5], data2[6], data2[7], choice)
-head2HeadExpanders(data2, data[1], data[2], data[3], data[4], data[5], data[6], data[7], choice)
+head2HeadExpanders(data, data2[1], data2[2], data2[3], data2[4], data2[5], data2[6], data2[7], data[8], choice)
+head2HeadExpanders(data2, data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], choice)
 
 #Create average expanders        
 averageExpanders(data2, avg_yards_by_field, avg_td_by_field, avg_yPerG_by_field, avg_yPerA_by_field, avg_atts_by_field, avg_fmbInt_by_field, choice)
