@@ -1,14 +1,18 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import math
 import warnings
 warnings.filterwarnings('ignore')
 
+# ----- Initial Page Setup ----- #
 st.set_page_config(page_title="NFL Stats Dashboard",
                    page_icon=":bar_chart:",
                    layout="wide"
 )
 
+
+########## HELPER FUNCTIONS ##########
 #Helper function to create dataframe data for each sheet
 def setDF(option):
     sheet = ''
@@ -55,12 +59,10 @@ def setFig(category, html):
 
 #Helper function to plot figures
 def plotFig(columns, data):
-    count = 0
-    for c in columns:
+    for i, c in enumerate(columns):
         try:
-            data[count].update_yaxes(automargin=True, dtick=1)
-            c.plotly_chart(data[count], use_container_width=True)
-            count+=1
+            data[i].update_yaxes(automargin=True, dtick=1)
+            c.plotly_chart(data[i], use_container_width=True)
         except:
             print("ERROR")
 
@@ -87,8 +89,7 @@ def setupSidebar():
     )
     return choice, rank, rank2, rank - 1, rank2 - 1
 
-# ----- Setup sidebar components and DataFrame -----
-
+#Helper function to setup detailed df
 def setupDetailed(df, formatted_rank, choice):
     data = [df.iloc[formatted_rank]['Rk'], df.iloc[formatted_rank]['Player'], df.iloc[formatted_rank]['Yds'], df.iloc[formatted_rank]['TD'], df.iloc[formatted_rank]['Y/G']]
     if choice == 'Rushing':
@@ -104,16 +105,64 @@ def setupDetailed(df, formatted_rank, choice):
         data.append(df.iloc[formatted_rank]['Rec'])
         data.append(df.iloc[formatted_rank]['Fmb'])
     return data
-    
+
+
+#Helper function to create expanders
+#Average
+def averageExpanders(data, yards, td, yg, ya, att, fmb, choice):
+    with st.expander(f"Average Metrics of Selected Players", expanded=True):
+        if math.isnan(yards):
+            yards = td = yg = ya = att = fmb = 0
+        columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
+        with left_column:
+            st.metric(label='Yards', value=yards)
+        with midleft_column:
+            st.metric(label='TD', value=td)
+        with middle_column:
+            st.metric(label='Y/G', value=yg)
+        with midright_column:
+            st.metric(label='Y/A', value=ya)
+        with right_column:
+            if choice == 'Receiving':
+                st.metric(label='Rec', value=att)
+            else:
+                st.metric(label='Att', value=att)
+        with farright_column:
+            if choice == 'Passing':
+                st.metric(label='Int', value=fmb)
+            else:
+                st.metric(label='Fmb', value=fmb)
+
+#Head-2-Head             
+def head2HeadExpanders(data, opp, yards, td, yg, ya, att, fmb, choice):
+    labelVal = f"Detailed Stats of {data[1]} compared to {opp}"
+    with st.expander(labelVal, expanded=True):
+        st.write(f"Rank: {int(data[0])}")
+        columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
+        with left_column:
+            st.metric(label='Yards', value=int(data[2]), delta=int(data[2]-yards))
+        with midleft_column:
+            st.metric(label='TD', value=int(data[3]), delta=int(data[3]-td))
+        with middle_column:
+            st.metric(label='Y/G', value=data[4], delta=round(data[4]-yg, 2))
+        with midright_column:
+            st.metric(label='Y/A', value=data[5], delta=round(data[5]-ya, 2))
+        with right_column:
+            if choice == 'Receiving':
+                st.metric(label='Rec', value=int(data[6]), delta=int(data[6]-att))
+            else:
+                st.metric(label='Att', value=int(data[6]), delta=int(data[6]-att))
+        with farright_column:
+            if choice == 'Passing':
+                st.metric(label='Int', value=int(data[7]), delta=int(data[7]-fmb), delta_color="inverse")
+            else:
+                st.metric(label='Fmb', value=int(data[7]), delta=int(data[7]-fmb), delta_color="inverse")
+                
+########## END HELPER FUNCTIONS ##########
+
 choice, rank, rank2, formatted_rank, formatted_rank2 = setupSidebar()
-print(formatted_rank)
-# 2 Things, 1st, possibly use radio button to move between 2 different views, such as top 50 and h2h and maybe detailed?
-# 2nd, possbily use the following code to access a specific player and display that at all times at top of page?
-# Possibly replace the detailed option on the radio button? Use textinput or number input?
-# df.iloc[number] grabs the object at that position which should correlate with that players rank + 1.
-# example: df.iloc[0] on rushing gives Jonathon Taylor.
 df = setDF(choice)
-print(df.iloc[formatted_rank])
+
 players = st.sidebar.multiselect(
     "Select Players to compare:",
     options=df['Player'].unique(),
@@ -130,10 +179,8 @@ df_selection = df.query(
     "Player == @players & Pos == @pos"
     )
 
-# ----- DETAILED -----
-
-
-# ----- KPI's -----
+########## KPI's ##########
+# ----- Averages ----- #
 avg_yards_by_field = round(df_selection['Yds'].mean(), 1)
 avg_td_by_field = round(df_selection['TD'].mean(), 1)
 avg_yPerG_by_field = round(df_selection['Y/G'].mean(), 1)
@@ -147,10 +194,11 @@ if choice == 'Passing':
     avg_fmbInt_by_field = round(df_selection['Int'].mean(), 1)
 else:
     avg_fmbInt_by_field = round(df_selection['Fmb'].mean(), 1)
-# ----- YARDS -----
+    
+# ----- YARDS ----- #
 yardsData = setFig('Yds', "<b>Yards by Player</b>")
 
-# ----- TARGETS/ATTEMPTS/COMPLETIONS/TD -----
+# ----- TARGETS/ATTEMPTS/COMPLETIONS/TD ----- #
 if choice == 'Receiving':
     tgt_atmps = setFig('Tgt', "<b>Recieving Targets by Player</b>")
     recp_rave_comp = setFig('Rec', "<b>Receptions by Player</b>")
@@ -161,84 +209,26 @@ elif choice == 'Passing':
     td = setFig('TD', "<b>Passing TD by Player</b>")
 else:
     tgt_atmps = setFig('Att', "<b>Rushing Attempts by Player</b>")
-    recp_rave_comp = setFig('Y/A', "<b>Yards Average per Attempt by Player</b>")
+    recp_rave_comp = setFig('Y/A', "<b>Yards per Attempt by Player</b>")
     td = setFig('TD', "<b>Rushing TD by Player</b>")
-# ----- CONTENT -----
-# Top Detailed/Top graphs
+
+########## END KPI's ##########
+    
+########## CONTENT ##########
+#Setup data for expanders
 data = setupDetailed(df, formatted_rank, choice)
 data2 = setupDetailed(df, formatted_rank2, choice)
-columns = [left_column, right_column] = st.columns(2)
-with left_column:
-    st.subheader(f"Rank:  {int(data[0])}")
-with right_column:
-    st.subheader(f"Player:  {data[1]}")
-    
-columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
-with left_column:
-    st.metric(label='Yards', value=int(data[2]), delta=round(data[2]-avg_yards_by_field, 2))
-with midleft_column:
-    st.metric(label='TD', value=int(data[3]), delta=round(data[3]-avg_td_by_field, 2))
-with middle_column:
-    st.metric(label='Y/G', value=data[4], delta=round(data[4]-avg_yPerG_by_field, 2))
-with midright_column:
-    st.metric(label='Y/A', value=data[5], delta=round(data[5]-avg_yPerA_by_field, 2))
-with right_column:
-    if choice == 'Receiving':
-        st.metric(label='Rec', value=data[6], delta=round(data[6]-avg_atts_by_field, 2))
-    else:
-        st.metric(label='Att', value=data[6], delta=round(data[6]-avg_atts_by_field, 2))
-with farright_column:
-    if choice == 'Passing':
-        st.metric(label='Int', value=data[7], delta=round(data[7]-avg_fmbInt_by_field, 2))
-    else:
-        st.metric(label='Fmb', value=data[7], delta=round(data[7]-avg_fmbInt_by_field, 2))
-        
-st.markdown("---")
 
-columns = [left_column, right_column] = st.columns(2)
-with left_column:
-    st.subheader(f"Rank:  {int(data2[0])}")
-with right_column:
-    st.subheader(f"Player:  {data2[1]}")
-    
-columns = [left_column, midleft_column, middle_column, midright_column, right_column, farright_column] = st.columns(6)
-with left_column:
-    st.metric(label='Yards', value=int(data2[2]), delta=round(data2[2]-avg_yards_by_field, 2))
-with midleft_column:
-    st.metric(label='TD', value=int(data2[3]), delta=round(data2[3]-avg_td_by_field, 2))
-with middle_column:
-    st.metric(label='Y/G', value=data2[4], delta=round(data2[4]-avg_yPerG_by_field, 2))
-with midright_column:
-    st.metric(label='Y/A', value=data2[5], delta=round(data2[5]-avg_yPerA_by_field, 2))
-with right_column:
-    if choice == 'Receiving':
-        st.metric(label='Rec', value=data2[6], delta=round(data2[6]-avg_atts_by_field, 2))
-    else:
-        st.metric(label='Att', value=data2[6], delta=round(data2[6]-avg_atts_by_field, 2))
-with farright_column:
-    if choice == 'Passing':
-        st.metric(label='Int', value=data2[7], delta=round(data2[7]-avg_fmbInt_by_field, 2))
-    else:
-        st.metric(label='Fmb', value=data2[7], delta=round(data2[7]-avg_fmbInt_by_field, 2))
-        
-st.markdown("---")
+#Create 1st and 2nd H2H expanders
+head2HeadExpanders(data, data2[1], data2[2], data2[3], data2[4], data2[5], data2[6], data2[7], choice)
+head2HeadExpanders(data2, data[1], data[2], data[3], data[4], data[5], data[6], data[7], choice)
 
+#Create average expanders        
+averageExpanders(data2, avg_yards_by_field, avg_td_by_field, avg_yPerG_by_field, avg_yPerA_by_field, avg_atts_by_field, avg_fmbInt_by_field, choice)
 
-columns = [left_column, middle_column, right_column] = st.columns(3)
-with left_column:
-    st.subheader("Average Yards of Selected:")
-    st.subheader(f'{avg_yards_by_field}')
-with middle_column:
-    st.subheader("Average TD of Selected:")
-    st.subheader(f'{avg_td_by_field}')
-with right_column:
-    st.subheader("Average Yards per Game of Selected")
-    st.subheader(f'{avg_yPerG_by_field}')
-st.markdown("---")
-
+#Top graphs
 columns = [left_column, right_column] = st.columns(2)
 data = [yardsData, td]
-
 plotFig(columns, data)
 
 st.markdown("---")
@@ -246,7 +236,6 @@ st.markdown("---")
 #Bottom graphs
 columns = [leftbot_column, rightbot_column] = st.columns(2)
 data = [recp_rave_comp, tgt_atmps]
-
 plotFig(columns, data)
 
 
