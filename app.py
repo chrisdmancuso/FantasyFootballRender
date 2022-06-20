@@ -285,7 +285,7 @@ with st.expander(f"Detailed {choice} of {data[1]} against {data2[1]}", expanded=
         columns = [col1, col2, col3, col4, col5, col6, col7, col8] = st.columns(8)
     head2headExpander(columns, data, data2, choice)
     
-with st.expander(f"Detailed {choice} of{data2[1]} against {data[1]}", expanded=True):
+with st.expander(f"Detailed {choice} of {data2[1]} against {data[1]}", expanded=True):
     st.write(f"Rank: {int(data2[0])}")
     
     columns = [col1, col2, col3, col4, col5, col6] = st.columns(6)
@@ -303,7 +303,8 @@ with st.expander(f"Detailed {choice} of{data2[1]} against {data[1]}", expanded=T
 averageExpanders(all_KPIs, choice)
 
 
-################ Clean up averageExpanders, and possibly above h2h
+################ Clean up averageExpanders, and possibly above h2h. Try to make the expander
+#into reusable code?
 
 
 #Top graphs
