@@ -13,19 +13,23 @@ st.set_page_config(page_title="NFL Stats Dashboard",
 
 
 ########## HELPER FUNCTIONS ##########
-#Helper function to create dataframe data for each sheet
-def setDF(option):
+#Helper function to create dataframe for each sheet
+@st.cache
+def setDF(choice, rankSort):
     sheet = ''
     skip = 0
-    if option == 'Receiving':
+    if choice == 'Receiving':
         sheet = 'nfl_receiving_formatted'
-        cols = 'A:Z'
-    elif option == 'Passing':
+        cols = 'A:AA'
+    elif choice == 'Passing':
         sheet = 'nfl_passing_formatted'
-        cols = 'A:AC'
-    elif option == 'Rushing':
+        cols = 'A:AD'
+    elif choice == 'Rushing':
         sheet = 'nfl_rushing_formatted'
-        cols = 'A:Z'
+        cols = 'A:AA'
+    if rankSort == 'Fantasy':
+        sheet = sheet + '_FP'
+        print(sheet)
     df = pd.read_excel(
     io="nfl_stats_fp.xlsx",
     engine="openpyxl",
@@ -35,6 +39,40 @@ def setDF(option):
     nrows=50
     )
     return df
+
+#Helper function to setup detailed df
+def setupDetailed(df, formatted_rank, choice, rankSort):
+    rk = 'FRk'
+    if rankSort == 'NFL':
+        rk = 'Rk'
+    data = [df.iloc[formatted_rank][rk], df.iloc[formatted_rank]['Player'], df.iloc[formatted_rank]['Yds']]
+    try:
+        data.append(df.iloc[formatted_rank]['YdsRec'])
+    except:
+        data.append(df.iloc[formatted_rank]['YdsRush'])
+    data.append(df.iloc[formatted_rank]['TD'])
+    try:
+        data.append(df.iloc[formatted_rank]['TDRec'])
+    except:
+        data.append(df.iloc[formatted_rank]['TDRush'])
+    data.append(df.iloc[formatted_rank]['Y/G'])
+    try:
+        data.append(df.iloc[formatted_rank]['Y/R'])
+    except:
+        data.append(df.iloc[formatted_rank]['Y/A'])
+    if choice == 'Rushing' or choice == 'Passing':
+        data.append(df.iloc[formatted_rank]['Att'])
+    else:
+        data.append(df.iloc[formatted_rank]['Rec'])
+    try:
+        data.append(df.iloc[formatted_rank]['Int'])
+        data.append(df.iloc[formatted_rank]['Fmb'])
+    except:
+        data.append(df.iloc[formatted_rank]['Fmb'])
+    data.append(df.iloc[formatted_rank]['FPPG'])
+    data.append(df.iloc[formatted_rank]['FP'])
+    data.append(df.iloc[formatted_rank]['Pos'])
+    return data
 
 #Helper function to create figures
 def setFig(category, html):
@@ -67,8 +105,12 @@ def plotFig(columns, data):
 
 #Helper function to setup sidebar
 def setupSidebar():
+    rankSort = st.sidebar.selectbox(
+    "Sort Rankings by:",
+    ["Fantasy", "NFL"])
+    
     choice = st.sidebar.selectbox(
-    "Choose a Stat:",
+    "Choose a Stat Sheet:",
     ['Receiving', 'Passing', 'Rushing' ]
     )
 
@@ -86,44 +128,62 @@ def setupSidebar():
     step=1,
     key=1
     )
-    return choice, rank, rank2, rank - 1, rank2 - 1
+    return rankSort, choice, rank, rank2, rank - 1, rank2 - 1
 
-#Helper function to setup detailed df
-def setupDetailed(df, formatted_rank, choice):
-    data = [df.iloc[formatted_rank]['Rk'], df.iloc[formatted_rank]['Player'], df.iloc[formatted_rank]['Yds']]
+#Second Helper function to setup sidebar
+def setupSidebarChoice(df):
+    pos = st.sidebar.multiselect(
+        "Select Position(s):",
+        options=df["Pos"].unique(),
+        default=df["Pos"].unique()
+        )
+
+    players = st.sidebar.multiselect(
+        "Select Players to compare:",
+        options=df['Player'].unique(),
+        default=df['Player'].unique()
+        )
+    
+    df_selection = df.query(
+        "Player == @players & Pos == @pos"
+        )
+    return df_selection
+
+#Helper to setup KPIs/Figs based on user choice
+def choiceKPIFig(choice, df_selection):
     try:
-        data.append(df.iloc[formatted_rank]['YdsRec'])
+        yPa = round(df_selection['Y/A'].mean(), 1)
+        att = round(df_selection['Att'].mean(), 1)
     except:
-        data.append(df.iloc[formatted_rank]['YdsRush'])
-    data.append(df.iloc[formatted_rank]['TD'])
+        yPa = round(df_selection['Y/R'].mean(), 1)
+        att = round(df_selection['Rec'].mean(), 1)
     try:
-        data.append(df.iloc[formatted_rank]['TDRec'])
+        otherYds = round(df_selection['YdsRush'].mean(), 1)
+        otherTD = round(df_selection['TDRush'].mean(), 1)
     except:
-        data.append(df.iloc[formatted_rank]['TDRush'])
-    data.append(df.iloc[formatted_rank]['Y/G'])
+        otherYds = round(df_selection['YdsRec'].mean(), 1)
+        otherTD = round(df_selection['TDRec'].mean(), 1)
     try:
-        data.append(df.iloc[formatted_rank]['Y/R'])
+        fmbInt = [round(df_selection['Fmb'].mean(), 1) ,round(df_selection['Int'].mean(), 1)]
     except:
-        data.append(df.iloc[formatted_rank]['Y/A'])
-    if choice == 'Rushing' or choice == 'Passing':
-        data.append(df.iloc[formatted_rank]['Att'])
+        fmbInt = [round(df_selection['Fmb'].mean(), 1)]
+    if choice == 'Passing':
+        tgt_atmps = setFig('Att', "<b>Passing Attempts by Player</b>")
+        recp_rave_comp = setFig('Cmp', "<b>Completions by Player</b>")
+        td = setFig('TD', "<b>Passing TD by Player</b>")
+    elif choice == 'Receiving':
+        tgt_atmps = setFig('Tgt', "<b>Recieving Targets by Player</b>")
+        recp_rave_comp = setFig('Rec', "<b>Receptions by Player</b>")
+        td = setFig('TD', "<b>Receiving TD by Player</b>")
     else:
-        data.append(df.iloc[formatted_rank]['Rec'])
-    try:
-        data.append(df.iloc[formatted_rank]['Int'])
-        data.append(df.iloc[formatted_rank]['Fmb'])
-    except:
-        data.append(df.iloc[formatted_rank]['Fmb'])
-    data.append(df.iloc[formatted_rank]['FPPG'])
-    data.append(df.iloc[formatted_rank]['FP'])
-    return data
-
+        tgt_atmps = setFig('Att', "<b>Rushing Attempts by Player</b>")
+        recp_rave_comp = setFig('Y/A', "<b>Yards per Attempt by Player</b>")
+        td = setFig('TD', "<b>Rushing TD by Player</b>")
+    return [yPa, att, otherYds, otherTD, fmbInt], [tgt_atmps, recp_rave_comp, td]
 
 #Helper function to create expanders
 #Average
 def averageExpanders(data, choice):
-    #all_KPIs = avg_KPIs + choice_KPIs
-    #avg_KPIs = [avg_yards_by_field, avg_td_by_field, avg_yPerG_by_field, avg_fppg_by_field, avg_fp_by_field]
     if choice == 'Passing' or 'Receiving':
         labelOtherYards = 'Rushing Yards'
         labelOtherTD = 'Rushing TD'
@@ -138,6 +198,7 @@ def averageExpanders(data, choice):
             st.metric(label='Total FP', value=data[4])
         with right_column:
             st.metric(label='FPPG', value=data[3])
+            
         columns = [farthestleft_column, left_column, midleft_column, col, middle_column, midright_column, right_column, farright_column, farthestright_column] = st.columns(9)
         with farthestleft_column:
             st.metric(label=f'{choice} Yards', value=data[0])
@@ -196,60 +257,35 @@ def head2headExpander(columns, values, values2, choice):
             else:
                 st.metric(label=labels[i], value=float(temp[i]), delta=round(temp[i]-temp2[i], 2), delta_color=color)
 
-#Helper to setup KPIs/Figs based on user choice
-def choiceKPIFig(choice, df_selection):
-    try:
-        yPa = round(df_selection['Y/A'].mean(), 1)
-        att = round(df_selection['Att'].mean(), 1)
-    except:
-        yPa = round(df_selection['Y/R'].mean(), 1)
-        att = round(df_selection['Rec'].mean(), 1)
-    try:
-        otherYds = round(df_selection['YdsRush'].mean(), 1)
-        otherTD = round(df_selection['TDRush'].mean(), 1)
-    except:
-        otherYds = round(df_selection['YdsRec'].mean(), 1)
-        otherTD = round(df_selection['TDRec'].mean(), 1)
-    try:
-        fmbInt = [round(df_selection['Fmb'].mean(), 1) ,round(df_selection['Int'].mean(), 1)]
-    except:
-        fmbInt = [round(df_selection['Fmb'].mean(), 1)]
-    if choice == 'Passing':
-        tgt_atmps = setFig('Att', "<b>Passing Attempts by Player</b>")
-        recp_rave_comp = setFig('Cmp', "<b>Completions by Player</b>")
-        td = setFig('TD', "<b>Passing TD by Player</b>")
-    elif choice == 'Receiving':
-        tgt_atmps = setFig('Tgt', "<b>Recieving Targets by Player</b>")
-        recp_rave_comp = setFig('Rec', "<b>Receptions by Player</b>")
-        td = setFig('TD', "<b>Receiving TD by Player</b>")
-    else:
-        tgt_atmps = setFig('Att', "<b>Rushing Attempts by Player</b>")
-        recp_rave_comp = setFig('Y/A', "<b>Yards per Attempt by Player</b>")
-        td = setFig('TD', "<b>Rushing TD by Player</b>")
-    return [yPa, att, otherYds, otherTD, fmbInt], [tgt_atmps, recp_rave_comp, td]
+#Full expander code                
+def fullExpanders(choice, rankSort, data, data2=None):
+    with st.expander(f"Detailed Stats of {data[1]} versus {data2[1]}", expanded=True):
+        st.write(f"Relative {rankSort} Rank: {int(data[0])}")
+        st.write(f"Position: {data[-1]}")
+        columns = [col1, col2, col3, col4, col5, col6] = st.columns(6)
+        fp = 11
+        fppg = 10
+        if choice == 'Passing':
+            fppg = 11
+            fp = 12
+        with col1:
+            st.metric(label='Total FP', value=data[fp], delta=round(data[fp]-data2[fp], 2))
+        with col2:
+            st.metric(label='FPPG', value=data[fppg], delta=round(data[fppg]-data2[fppg], 2))
+        if choice == 'Passing':
+            columns = [col1, col2, col3, col4, col5, col6, col7, col8, col9] = st.columns(9)
+        else:
+            columns = [col1, col2, col3, col4, col5, col6, col7, col8] = st.columns(8)
+        head2headExpander(columns, data, data2, choice)
     
 ########## END HELPER FUNCTIONS ##########
                 
 ########## SIDEBAR AND DF ##########
-choice, rank, rank2, formatted_rank, formatted_rank2 = setupSidebar()
-df = setDF(choice)
+rankSort, choice, rank, rank2, formatted_rank, formatted_rank2 = setupSidebar()
+df = setDF(choice, rankSort)
+df_selection = setupSidebarChoice(df)
 
-players = st.sidebar.multiselect(
-    "Select Players to compare:",
-    options=df['Player'].unique(),
-    default=df['Player'].unique()
-    )
-
-pos = st.sidebar.multiselect(
-    "Select Position(s):",
-    options=df["Pos"].unique(),
-    default=df["Pos"].unique()
-    )
-
-df_selection = df.query(
-    "Player == @players & Pos == @pos"
-    )
-########## END SIDEBAR ##########
+########## END SIDEBAR AND DF ##########
 
 ########## KPI's ##########
 # ----- Averages ----- #
@@ -268,45 +304,15 @@ all_KPIs = avg_KPIs + choice_KPIs
     
 ########## CONTENT ##########
 #Setup data for expanders
-data = setupDetailed(df, formatted_rank, choice)
-data2 = setupDetailed(df, formatted_rank2, choice)
+data = setupDetailed(df, formatted_rank, choice, rankSort)
+data2 = setupDetailed(df, formatted_rank2, choice, rankSort)
 
 #Create 1st and 2nd H2H expanders
-with st.expander(f"Detailed {choice} of {data[1]} against {data2[1]}", expanded=True):
-    st.write(f"Rank: {int(data[0])}")
-    
-    columns = [col1, col2, col3, col4, col5, col6] = st.columns(6)
-    with col1:
-        st.metric(label='Total FP', value=data[11], delta=round(data[11]-data2[11], 2))
-    with col2:
-        st.metric(label='FPPG', value=data[10], delta=round(data[10]-data2[10], 2))
-    if choice == 'Passing':
-        columns = [col1, col2, col3, col4, col5, col6, col7, col8, col9] = st.columns(9)
-    else:
-        columns = [col1, col2, col3, col4, col5, col6, col7, col8] = st.columns(8)
-    head2headExpander(columns, data, data2, choice)
-    
-with st.expander(f"Detailed {choice} of {data2[1]} against {data[1]}", expanded=True):
-    st.write(f"Rank: {int(data2[0])}")
-    
-    columns = [col1, col2, col3, col4, col5, col6] = st.columns(6)
-    with col1:
-        st.metric(label='Total FP', value=data2[11], delta=round(data2[11]-data[11], 2))
-    with col2:
-        st.metric(label='FPPG', value=data2[10], delta=round(data2[10]-data[10], 2))
-    if choice == 'Passing':
-        columns = [col1, col2, col3, col4, col5, col6, col7, col8, col9] = st.columns(9)
-    else:
-        columns = [col1, col2, col3, col4, col5, col6, col7, col8] = st.columns(8)
-    head2headExpander(columns, data2, data, choice)
+fullExpanders(choice, rankSort, data, data2)
+fullExpanders(choice, rankSort, data2, data)
 
 #Create average expanders        
 averageExpanders(all_KPIs, choice)
-
-
-################ Clean up averageExpanders, and possibly above h2h. Try to make the expander
-#into reusable code?
-
 
 #Top graphs
 columns = [left_column, right_column] = st.columns(2)
