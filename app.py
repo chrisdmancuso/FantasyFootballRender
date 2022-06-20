@@ -156,13 +156,14 @@ def averageExpanders(data, choice):
                 st.metric(label='Rec', value=data[6])
             else:
                 st.metric(label='Att', value=data[6])
-        with farright_column:
-            if choice == 'Passing':
-                st.metric(label='Int', value=data[9][0])
-                with farthestright_column:
-                    st.metric(label='Fmb', value=data[9][1])
-            else:
-                st.metric(label='Fmb', value=data[9][0])
+        if type(data) != list:
+            with farright_column:
+                if choice == 'Passing':
+                    st.metric(label='Int', value=data[9][0])
+                    with farthestright_column:
+                        st.metric(label='Fmb', value=data[9][1])
+                else:
+                    st.metric(label='Fmb', value=data[9][0])
 
 #Head-2-Head             
 def head2headExpander(columns, values, values2, choice):
